@@ -9,6 +9,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <memory.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #ifdef __x86_64__
 #define int long
 #endif
@@ -35,9 +39,8 @@ enum {
 };
 
 // opcodes
-enum { LEA ,IMM ,JMP ,JSR ,BZ  ,BNZ ,ENT ,ADJ ,LEV ,LI  ,LC  ,SI  ,SC  ,PSH ,
-       OR  ,XOR ,AND ,EQ  ,NE  ,LT  ,GT  ,LE  ,GE  ,SHL ,SHR ,ADD ,SUB ,MUL ,DIV ,MOD ,
-       OPEN,READ,CLOS,PRTF,MALC,MSET,MCMP,EXIT };
+enum { LEA ,IMM ,JMP ,JSR ,JADR,BZ  ,BNZ ,ENT ,ADJ ,LEV ,LI  ,LC  ,SI  ,SC  ,PSH ,
+       OR  ,XOR ,AND ,EQ  ,NE  ,LT  ,GT  ,LE  ,GE  ,SHL ,SHR ,ADD ,SUB ,MUL ,DIV ,MOD };
 
 // types
 enum { CHAR, INT, PTR };
@@ -56,9 +59,8 @@ next()
         printf("%d: %.*s", line, p - lp, lp);
         lp = p;
         while (le < e) {
-          printf("%8.4s", &"LEA ,IMM ,JMP ,JSR ,BZ  ,BNZ ,ENT ,ADJ ,LEV ,LI  ,LC  ,SI  ,SC  ,PSH ,"
-                           "OR  ,XOR ,AND ,EQ  ,NE  ,LT  ,GT  ,LE  ,GE  ,SHL ,SHR ,ADD ,SUB ,MUL ,DIV ,MOD ,"
-                           "OPEN,READ,CLOS,PRTF,MALC,MSET,MCMP,EXIT,"[*++le * 5]);
+          printf("%8.4s", &"LEA ,IMM ,JMP ,JSR ,JADR,BZ  ,BNZ ,ENT ,ADJ ,LEV ,LI  ,LC  ,SI  ,SC  ,PSH ,"
+                           "OR  ,XOR ,AND ,EQ  ,NE  ,LT  ,GT  ,LE  ,GE  ,SHL ,SHR ,ADD ,SUB ,MUL ,DIV ,MOD ,"[*++le * 5]);
           if (*le <= ADJ) printf(" %d\n", *++le); else printf("\n");
         }
       }
@@ -153,7 +155,7 @@ expr(int lev)
       t = 0;
       while (tk != ')') { expr(Assign); *++e = PSH; ++t; if (tk == ',') next(); }
       next();
-      if (d[Class] == Sys) *++e = d[Val];
+      if (d[Class] == Sys) { *++e = JADR; *++e = d[Val]; }
       else if (d[Class] == Fun) { *++e = JSR; *++e = d[Val]; }
       else { printf("%d: bad function call\n", line); exit(-1); }
       if (t) { *++e = ADJ; *++e = t; }
@@ -336,7 +338,8 @@ run(int poolsz, int *start, int argc, char **argv)
 
   // setup stack
   sp = (int *)((int)sp + poolsz);
-  *--sp = EXIT; // call exit if main returns
+  *--sp = (int)exit;            // call exit if main returns
+  *--sp = JADR;
   *--sp = PSH; t = sp;
   *--sp = argc;
   *--sp = (int)argv;
@@ -348,9 +351,8 @@ run(int poolsz, int *start, int argc, char **argv)
     i = *pc++; ++cycle;
     if (debug) {
       printf("%d> %.4s", cycle,
-        &"LEA ,IMM ,JMP ,JSR ,BZ  ,BNZ ,ENT ,ADJ ,LEV ,LI  ,LC  ,SI  ,SC  ,PSH ,"
-         "OR  ,XOR ,AND ,EQ  ,NE  ,LT  ,GT  ,LE  ,GE  ,SHL ,SHR ,ADD ,SUB ,MUL ,DIV ,MOD ,"
-         "OPEN,READ,CLOS,PRTF,MALC,MSET,MCMP,EXIT,"[i * 5]);
+        &"LEA ,IMM ,JMP ,JSR ,JADR,BZ  ,BNZ ,ENT ,ADJ ,LEV ,LI  ,LC  ,SI  ,SC  ,PSH ,"
+         "OR  ,XOR ,AND ,EQ  ,NE  ,LT  ,GT  ,LE  ,GE  ,SHL ,SHR ,ADD ,SUB ,MUL ,DIV ,MOD ,"[i * 5]);
       if (i <= ADJ) printf(" %d\n", *pc); else printf("\n");
     }
     if      (i == LEA) a = (int)(bp + *pc++);                             // load local address
@@ -385,14 +387,18 @@ run(int poolsz, int *start, int argc, char **argv)
     else if (i == DIV) a = *sp++ /  a;
     else if (i == MOD) a = *sp++ %  a;
 
-    else if (i == OPEN) a = open((char *)sp[1], *sp);
-    else if (i == READ) a = read(sp[2], (char *)sp[1], *sp);
-    else if (i == CLOS) a = close(*sp);
-    else if (i == PRTF) { t = sp + pc[1]; a = printf((char *)t[-1], t[-2], t[-3], t[-4], t[-5], t[-6]); }
-    else if (i == MALC) a = (int)malloc(*sp);
-    else if (i == MSET) a = (int)memset((char *)sp[2], sp[1], *sp);
-    else if (i == MCMP) a = memcmp((char *)sp[2], (char *)sp[1], *sp);
-    else if (i == EXIT) { printf("exit(%d) cycle = %d\n", *sp, cycle); return *sp; }
+    else if (i == JADR) {
+            a = *pc++;
+            if (a == (int)open) a = open((char *)sp[1], *sp);
+            else if (a == (int)read) a = read(sp[2], (char *)sp[1], *sp);
+            else if (a == (int)close) a = close(*sp);
+            else if (a == (int)printf) { t = sp + pc[1]; a = printf((char *)t[-1], t[-2], t[-3], t[-4], t[-5], t[-6]); }
+            else if (a == (int)malloc) a = (int)malloc(*sp);
+            else if (a == (int)memset) a = (int)memset((char *)sp[2], sp[1], *sp);
+            else if (a == (int)memcmp) a = memcmp((char *)sp[2], (char *)sp[1], *sp);
+            else if (a == (int)exit) { printf("exit(%d) cycle = %d\n", *sp, cycle); return *sp; }
+            else { printf("invalid external address = %x! cycle = %d\n", a, cycle); return -1; }
+    }
     else { printf("unknown instruction = %d! cycle = %d\n", i, cycle); return -1; }
   }
 }
@@ -418,11 +424,15 @@ main(int argc, char **argv)
   memset(e,    0, poolsz);
   memset(data, 0, poolsz);
 
-  p = "char else enum if int return sizeof while "
-      "open read close printf malloc memset memcmp exit main";
+  p = "char else enum if int return sizeof while main";
   i = Char; while (i <= While) { next(); id[Tk] = i++; } // add keywords to symbol table
-  i = OPEN; while (i <= EXIT) { next(); id[Class] = Sys; id[Type] = INT; id[Val] = i++; } // add library to symbol table
   next(); idmain = id; // keep track of main
+  p = "open";    next(); id[Class] = Sys; id[Type] = INT; id[Val] = (int)open;
+  p = "read";    next(); id[Class] = Sys; id[Type] = INT; id[Val] = (int)read;
+  p = "close";   next(); id[Class] = Sys; id[Type] = INT; id[Val] = (int)close;
+  p = "printf";  next(); id[Class] = Sys; id[Type] = INT; id[Val] = (int)printf;
+  p = "memset";  next(); id[Class] = Sys; id[Type] = INT; id[Val] = (int)memset;
+  p = "memcmp";  next(); id[Class] = Sys; id[Type] = INT; id[Val] = (int)memcmp;
 
   if (!(lp = p = malloc(poolsz))) { printf("could not malloc(%d) source area\n", poolsz); return -1; }
   if ((i = read(fd, p, poolsz-1)) <= 0) { printf("read() returned %d\n", i); return -1; }
