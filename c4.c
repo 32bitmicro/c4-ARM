@@ -538,6 +538,17 @@ int *codegenarm(int *jitmem, int reloc)
     else if (i >= OPEN) {
       if (i == PRTF) tmp = (int)dlsym(0, "printf");
       else if (i == EXIT) tmp = (int)dlsym(0, "exit");
+      if (*pc++ != ADJ) {
+        printf("no ADJ after native proc!\n");
+        exit(2);
+      }
+      i = *pc++;
+      if (i > 4) {
+        printf("no support for 5+ arguments!\n");
+        exit(3);
+      }
+      while (i > 0)
+        *je++ = 0xe49d0004 | (--i << 12); // pop r(i-1)
       *je++ = 0xe28fe000;       // add lr, pc, #0
       *--ll = tmp;
       *je++ = 0xe515f000 + (literal - ll) * 4; // ldr  pc, [r5, #-(literal - ll)]
