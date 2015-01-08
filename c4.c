@@ -538,7 +538,7 @@ int *codegenarm(int *jitmem, int reloc)
     else if (i >= OPEN) {
       if (i == PRTF) tmp = (int)dlsym(0, "printf");
       else if (i == EXIT) tmp = (int)dlsym(0, "exit");
-      *je++ = 0xe28fe004;       // add lr, pc, #4
+      *je++ = 0xe28fe000;       // add lr, pc, #0
       *--ll = tmp;
       *je++ = 0xe515f000 + (literal - ll) * 4; // ldr  pc, [r5, #-(literal - ll)]
     }
