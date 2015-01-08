@@ -22,7 +22,8 @@
 char *p, *lp, // current position in source code
      *data, *_data;   // data/bss pointer
 
-int *e, *le, *text,  // current position in emitted code
+int *e, *le, *text, *ll,  // current position in emitted code
+    *literal, // literal pool, eating text buffer backward from the other end
     *id,      // currently parsed identifier
     *sym,     // symbol table (simple list of identifiers)
     tk,       // current token
@@ -506,6 +507,46 @@ char *codegen(char *jitmem, int reloc)
   return tje;
 }
 
+int *codegenarm(int *jitmem, int reloc)
+{
+  int *pc;
+  int i, tmp;        // temps
+  int *je, *tje;    // current position in emitted native code
+
+  // first pass: emit native code
+  pc = text + 1; je = jitmem; line = 0;
+  while (pc <= e) {
+    i = *pc;
+    *pc++ = ((int)je << 8) | i; // for later relocation of JMP/JSR/BZ/BNZ
+    if (i == ENT) {
+      *je++ = 0xe92d4800;             // push {fp, lr}
+      *je++ = 0xe28db004;             // add  fp, sp, #4
+      tmp = *pc++;
+      if (tmp)
+        *je++ = 0xe24dd000 + tmp * 4; // sub  sp, sp, #(tmp * 4)
+    }
+    else if (i == IMM) {
+      *--ll = *pc++;
+      *je++ = 0xe5150000 + (literal - ll) * 4; // ldr  r0, [r5, #-(literal - ll)]
+    }
+    else if (i == ADJ)
+      *je++ = 0xe28dd000 + *pc++ * 4; // add sp, sp, #(tmp * 4)
+    else if (i == PSH)
+      *je++ = 0xe52d0004;       // push {r0}
+    else if (i == LEV)
+      *je++ = 0xe8bd8800;       // pop {fp, pc}
+    else if (i >= OPEN) {
+      if (i == PRTF) tmp = (int)dlsym(0, "printf");
+      else if (i == EXIT) tmp = (int)dlsym(0, "exit");
+      *je++ = 0xe28fe004;       // add lr, pc, #4
+      *--ll = tmp;
+      *je++ = 0xe515f000 + (literal - ll) * 4; // ldr  pc, [r5, #-(literal - ll)]
+    }
+    else { printf("code generation failed for %d!\n", i); return 0; }
+  }
+  return je;
+}
+
 int jit(int poolsz, int *start, int argc, char **argv)
 {
   char *jitmem;      // executable memory for JIT-compiled native code
@@ -528,6 +569,43 @@ int jit(int poolsz, int *start, int argc, char **argv)
   *je++ = 0x5e;                                                     // pop %esi
   *je++ = 0xc3;                                                     // ret
   qsort(sym, 2, 1, (void *)tje); // hack to call a function pointer
+  return 0;
+}
+
+int jitarm(int poolsz, int *start, int argc, char **argv)
+{
+  char *jitmem;      // executable memory for JIT-compiled native code
+  int jitmain, *je, *tje, *_start;
+
+  // setup jit memory
+  // PROT_EXEC | PROT_READ | PROT_WRITE = 7
+  // MAP_PRIVATE | MAP_ANON = 0x22
+  jitmem = mmap(0, poolsz, 7, 0x22, -1, 0);
+  if (!jitmem) { printf("could not mmap(%d) jit executable memory\n", poolsz); return -1; }
+  if (src)
+    return 1;
+  je = (int*)jitmem;
+  *je++ = (int)literal;
+  *je++ = argc;
+  *je++ = (int)argv;
+  _start = je;
+  *je++ = 0xe51f5014;       // ldr     r5, [pc, #-20] ; literal
+  *je++ = 0xe51f0014;       // ldr     r0, [pc, #-20] ; argc
+  *je++ = 0xe51f1014;       // ldr     r1, [pc, #-20] ; argv
+  tje = je++;               // bl      jitmain
+
+  // we can't handle if main is the first address because the bl
+  // offset would be negative. add some padding to avoid that
+  je++;
+  je++;
+
+  if (!(je = codegenarm(je, 0)))
+    return 1;
+
+  jitmain = ((*(int *)start >> 8) & 0x00ffffff) - ((int)tje & 0x00ffffff);
+  *tje = 0xeb000000 | ((jitmain - 8) / 4);
+  __clear_cache(text, text + poolsz);
+  qsort(sym, 2, 1, (void *)_start); // hack to call a function pointer
   return 0;
 }
 
@@ -676,6 +754,7 @@ int main(int argc, char **argv)
   if (!(text = le = e = malloc(poolsz))) { printf("could not malloc(%d) text area\n", poolsz); return -1; }
   if (!(data = malloc(poolsz))) { printf("could not malloc(%d) data area\n", poolsz); return -1; }
 
+  ll = literal = (int*)((char*)text + poolsz);
   memset(sym,  0, poolsz);
   memset(e,    0, poolsz);
   memset(data, 0, poolsz);
@@ -795,7 +874,7 @@ int main(int argc, char **argv)
   if (writeelf)
     return elf32(poolsz, (int *)idmain[Val]);
   if (usejit)
-    return jit(poolsz, (int *)idmain[Val], argc, argv);
+    return jitarm(poolsz, (int *)idmain[Val], argc, argv);
   return run(poolsz, (int *)idmain[Val], argc, argv);
 }
 
