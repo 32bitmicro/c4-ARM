@@ -589,14 +589,15 @@ int jitarm(int poolsz, int *start, int argc, char **argv)
   *je++ = argc;
   *je++ = (int)argv;
   _start = je;
-  *je++ = 0xe51f5014;       // ldr     r5, [pc, #-20] ; literal
-  *je++ = 0xe51f0014;       // ldr     r0, [pc, #-20] ; argc
-  *je++ = 0xe51f1014;       // ldr     r1, [pc, #-20] ; argv
+  *je++ = 0xe92d5ff0;       // push    {r4-r12, lr}
+  *je++ = 0xe51f5018;       // ldr     r5, [pc, #-20] ; literal
+  *je++ = 0xe51f0018;       // ldr     r0, [pc, #-20] ; argc
+  *je++ = 0xe51f1018;       // ldr     r1, [pc, #-20] ; argv
   tje = je++;               // bl      jitmain
+  *je++ = 0xe8bd9ff0;       // pop     {r4-r12, pc}
 
   // we can't handle if main is the first address because the bl
   // offset would be negative. add some padding to avoid that
-  je++;
   je++;
 
   if (!(je = codegenarm(je, 0)))
