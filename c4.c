@@ -526,8 +526,13 @@ int *codegenarm(int *jitmem, int reloc)
         *je++ = 0xe24dd000 + tmp * 4; // sub  sp, sp, #(tmp * 4)
     }
     else if (i == IMM) {
-      *--ll = *pc++;
-      *je++ = 0xe5150000 + (literal - ll) * 4; // ldr  r0, [r5, #-(literal - ll)]
+      tmp = *pc++;
+      if (tmp < 256)
+        *je++ = 0xe3a00000 + tmp; // mov r0, #(tmp)
+      else {
+        *--ll = *pc++;
+        *je++ = 0xe5150000 + (literal - ll) * 4; // ldr  r0, [r5, #-(literal - ll)]
+      }
     }
     else if (i == ADJ)
       *je++ = 0xe28dd000 + *pc++ * 4; // add sp, sp, #(tmp * 4)
