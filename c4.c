@@ -621,7 +621,7 @@ int jitarm(int poolsz, int *start, int argc, char **argv)
 
   jitmain = ((*(int *)start >> 8) & 0x00ffffff) - ((int)tje & 0x00ffffff);
   *tje = 0xeb000000 | ((jitmain - 8) / 4);
-  __clear_cache(text, text + poolsz);
+  __clear_cache(jitmem, jitmem + poolsz/4);
   qsort(sym, 2, 1, (void *)_start); // hack to call a function pointer
   return 0;
 }
