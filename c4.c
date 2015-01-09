@@ -527,10 +527,10 @@ int *codegenarm(int *jitmem, int reloc)
     }
     else if (i == IMM) {
       tmp = *pc++;
-      if (tmp < 256)
+      if (0 <= tmp && tmp < 256)
         *je++ = 0xe3a00000 + tmp; // mov r0, #(tmp)
       else {
-        *--ll = *pc++;
+        *--ll = tmp;
         *je++ = 0xe5150000 + (literal - ll) * 4; // ldr  r0, [r5, #-(literal - ll)]
       }
     }
