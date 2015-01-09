@@ -517,6 +517,13 @@ int *codegenarm(int *jitmem, int reloc)
   pc = text + 1; je = jitmem; line = 0;
   while (pc <= e) {
     i = *pc;
+    if (debug) {
+      printf("%p -> %p: %8.4s", pc, je,
+             &"LEA ,IMM ,JMP ,JSR ,BZ  ,BNZ ,ENT ,ADJ ,LEV ,LI  ,LC  ,SI  ,SC  ,PSH ,"
+             "OR  ,XOR ,AND ,EQ  ,NE  ,LT  ,GT  ,LE  ,GE  ,SHL ,SHR ,ADD ,SUB ,MUL ,DIV ,MOD ,"
+             "OPEN,READ,WRIT,CLOS,PRTF,MALC,MSET,MCMP,MCPY,DSYM,QSRT,MMAP,EXIT,"[i * 5]);
+      if (i <= ADJ) printf(" %d\n", pc[1]); else printf("\n");
+    }
     *pc++ = ((int)je << 8) | i; // for later relocation of JMP/JSR/BZ/BNZ
     if (i == IMM) {
       tmp = *pc++;
