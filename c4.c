@@ -567,6 +567,14 @@ int *codegenarm(int *jitmem, int reloc)
     }
     else if (i == PSH)
       *je++ = 0xe52d0004;       // push {r0}
+    else if (i == ADD) {
+      *je++ = 0xe49d1004;        // pop     {r1}
+      *je++ = 0xe0800001;        // add     r0, r0, r1
+    }
+    else if (i == SUB) {
+      *je++ = 0xe49d1004;        // pop     {r1}
+      *je++ = 0xe0410000;        // sub     r0, r1, r0
+    }
     else if (i >= OPEN) {
       if (i == PRTF) tmp = (int)dlsym(0, "printf");
       else if (i == EXIT) tmp = (int)dlsym(0, "exit");
