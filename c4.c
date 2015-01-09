@@ -631,8 +631,13 @@ int *codegenarm(int *jitmem, int reloc)
       printf("division/modulo is NOT supported\n");
     }
     else if (i >= OPEN) {
-      if (i == PRTF) tmp = (int)dlsym(0, "printf");
-      else if (i == EXIT) tmp = (int)dlsym(0, "exit");
+      if      (i == OPEN) tmp = (int)dlsym(0, "open");   else if (i == READ) tmp = (int)dlsym(0, "read");
+      else if (i == WRIT) tmp = (int)dlsym(0, "write");
+      else if (i == CLOS) tmp = (int)dlsym(0, "close");  else if (i == PRTF) tmp = (int)dlsym(0, "printf");
+      else if (i == MALC) tmp = (int)dlsym(0, "malloc"); else if (i == MSET) tmp = (int)dlsym(0, "memset");
+      else if (i == MCMP) tmp = (int)dlsym(0, "memcmp"); else if (i == MCPY) tmp = (int)dlsym(0, "memcpy");
+      else if (i == MMAP) tmp = (int)dlsym(0, "mmap");   else if (i == DSYM) tmp = (int)dlsym(0, "dlsym");
+      else if (i == QSRT) tmp = (int)dlsym(0, "qsort");  else if (i == EXIT) tmp = (int)dlsym(0, "exit");
       else { printf("unrecognized code %d\n", i); return 0; }
       if (*pc++ != ADJ) {
         printf("no ADJ after native proc!\n");
