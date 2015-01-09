@@ -527,6 +527,7 @@ int *codegenarm(int *jitmem, int reloc)
         *je++ = 0xe5150000 + (literal - ll) * 4; // ldr  r0, [r5, #-(literal - ll)]
       }
     }
+    else if (i == JSR) { pc++; je++; } // postponed till second pass
     else if (i == ENT) {
       *je++ = 0xe92d4800;             // push {fp, lr}
       *je++ = 0xe28db004;             // add  fp, sp, #4
@@ -560,7 +561,21 @@ int *codegenarm(int *jitmem, int reloc)
     }
     else { printf("code generation failed for %d!\n", i); return 0; }
   }
-  return je;
+  tje = je;
+
+  // second pass
+  pc = text + 1;
+  while (pc <= e) {
+    i = *pc & 0xff;
+    je = (int*)(((*pc++ >> 8) & 0x00ffffff) | ((int)jitmem & 0xff000000)); // MSB is restored from jitmem
+    if (i == JSR) {
+      if      (i == JSR)   *je = 0xeb000000; // bl #(tmp)
+      tmp = ((*(int *)(*pc++) >> 8) & 0x00ffffff) | ((int)jitmem & 0xff000000); // extract address
+      *je = *je | (((tmp - (int)je - 8) >> 2) & 0x00ffffff);
+    }
+    else if (i < LEV) { ++pc; }
+  }
+  return tje;
 }
 
 int jit(int poolsz, int *start, int argc, char **argv)
