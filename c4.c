@@ -557,6 +557,10 @@ int *codegenarm(int *jitmem, int reloc)
     }
     else if (i == LI)
       *je++ = 0xe5900000;       // ldr r0, [r0]
+    else if (i == SI) {
+      *je++ = 0xe49d1004;       // pop {r1}
+      *je++ = 0xe5810000;       // ldr r0, [r1]
+    }
     else if (i == PSH)
       *je++ = 0xe52d0004;       // push {r0}
     else if (i >= OPEN) {
