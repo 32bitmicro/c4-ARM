@@ -22,8 +22,7 @@
 char *p, *lp, // current position in source code
      *data, *_data;   // data/bss pointer
 
-int *e, *le, *text, *ll,  // current position in emitted code
-    *literal, // literal pool, eating text buffer backward from the other end
+int *e, *le, *text,  // current position in emitted code
     *id,      // currently parsed identifier
     *sym,     // symbol table (simple list of identifiers)
     tk,       // current token
@@ -510,8 +509,14 @@ char *codegen(char *jitmem, int reloc)
 int *codegenarm(int *jitmem, int reloc)
 {
   int *pc;
-  int i, tmp;        // temps
+  int i, tmp, genpool;      // temps
   int *je, *tje;    // current position in emitted native code
+  int *immloc, *immval, *il, *iv, *imm0;
+
+  immloc = il = malloc(1024 * 4);
+  immval = iv = malloc(1024 * 4);
+  imm0 = 0;
+  genpool = 0;
 
   // first pass: emit native code
   pc = text + 1; je = jitmem; line = 0;
@@ -537,8 +542,9 @@ int *codegenarm(int *jitmem, int reloc)
       if (0 <= tmp && tmp < 256)
         *je++ = 0xe3a00000 + tmp; // mov r0, #(tmp)
       else {
-        *--ll = tmp;
-        *je++ = 0xe5150000 + (literal - ll) * 4; // ldr  r0, [r5, #-(literal - ll)]
+        if (!imm0) imm0 = je;
+        *il++ = (int)(je++);
+        *iv++ = tmp;
       }
     }
     else if (i == JSR || i == JMP) { pc++; je++; } // postponed till second pass
@@ -558,6 +564,7 @@ int *codegenarm(int *jitmem, int reloc)
     else if (i == LEV) {
       *je++ = 0xe28bd000;       // add sp, fp, #0
       *je++ = 0xe8bd8800;       // pop {fp, pc}
+      if (imm0) genpool = 1;
     }
     else if (i == LI)
       *je++ = 0xe5900000;       // ldr r0, [r0]
@@ -651,11 +658,35 @@ int *codegenarm(int *jitmem, int reloc)
       while (i > 0)
         *je++ = 0xe49d0004 | (--i << 12); // pop r(i-1)
       *je++ = 0xe28fe000;       // add lr, pc, #0
-      *--ll = tmp;
-      *je++ = 0xe515f000 + (literal - ll) * 4; // ldr  pc, [r5, #-(literal - ll)]
+      if (!imm0) imm0 = je;
+      *il++ = (int)je++ + 1;
+      *iv++ = tmp;
     }
     else { printf("code generation failed for %d!\n", i); return 0; }
+
+    if (!genpool && imm0 && (int)je > (int)imm0 + 3000) {
+      tje = je++;
+      genpool = 2;
+    }
+    if (genpool) {
+      if (debug) printf("POOL %d %d %d\n", genpool, il - immloc, je - imm0);
+      *je++ = 0; *je++ = 0; // random valid instructions for the pipeline
+      while (il > immloc) {
+        tmp = *--il;
+        if ((int)je > tmp + 4096 + 8) { printf("can't reach the pool\n"); exit(5); }
+        if (tmp & 1)
+          *(int*)(tmp - 1) = 0xe59ff000 | ((int)je - tmp - 7); // ldr pc, [pc, #..]
+        else
+          *(int*)tmp = 0xe59f0000 | ((int)je - tmp - 8); // ldr r0, [pc, #..]
+        *je++ = *--iv;
+      }
+      if (genpool == 2) // jump past the pool
+        *tje = 0xea000000 | ((int)je - (int)tje - 8); // b #(je)
+      imm0 = 0;
+      genpool = 0;
+    }
   }
+  if (il > immloc) { printf("code is not terminated by a LEV\n"); exit(6); }
   tje = je;
 
   // second pass
@@ -714,7 +745,7 @@ int jitarm(int poolsz, int *start, int argc, char **argv)
   if (src)
     return 1;
   je = (int*)jitmem;
-  *je++ = (int)literal;
+  *je++ = 0;
   *je++ = argc;
   *je++ = (int)argv;
   _start = je;
@@ -887,7 +918,6 @@ int main(int argc, char **argv)
   if (!(text = le = e = malloc(poolsz))) { printf("could not malloc(%d) text area\n", poolsz); return -1; }
   if (!(data = malloc(poolsz))) { printf("could not malloc(%d) data area\n", poolsz); return -1; }
 
-  ll = literal = (int*)((char*)text + poolsz);
   memset(sym,  0, poolsz);
   memset(e,    0, poolsz);
   memset(data, 0, poolsz);
