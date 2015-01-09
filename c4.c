@@ -579,6 +579,26 @@ int *codegenarm(int *jitmem, int reloc)
       *je++ = 0xe49d1004;        // pop     {r1}
       *je++ = 0xe0010000;        // and     r0, r1, r0
     }
+    else if (i == EQ || i == NE || i == LT ||
+             i == GE || i == GT || i == LE) {
+      *je++ = 0xe49d1004;       // pop     {r1}
+      *je++ = 0xe1510000;       // cmp     r1, r0
+      if (i == EQ || i == NE) {
+        je[0] = 0x03a00000;     // moveq   r0, #0
+        je[1] = 0x13a00000;     // movne   r0, #0
+      } else if (i == LT || i == GE) {
+        je[0] = 0xb3a00000;     // movlt   r0, #0
+        je[1] = 0xa3a00000;     // movge   r0, #0
+      } else {
+        je[0] = 0xc3a00000;     // movgt   r0, #0
+        je[1] = 0xd3a00000;     // movle   r0, #0
+      }
+      if (i == EQ || i == LT || i == GT)
+        je[0] = je[0] | 1;
+      else
+        je[1] = je[1] | 1;
+      je = je + 2;
+    }
     else if (i == SHL) {
       *je++ = 0xe49d1004;        // pop     {r1}
       *je++ = 0xe1a00011;        // lsl     r0, r1, r0
