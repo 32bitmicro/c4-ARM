@@ -518,14 +518,7 @@ int *codegenarm(int *jitmem, int reloc)
   while (pc <= e) {
     i = *pc;
     *pc++ = ((int)je << 8) | i; // for later relocation of JMP/JSR/BZ/BNZ
-    if (i == ENT) {
-      *je++ = 0xe92d4800;             // push {fp, lr}
-      *je++ = 0xe28db004;             // add  fp, sp, #4
-      tmp = *pc++;
-      if (tmp)
-        *je++ = 0xe24dd000 + tmp * 4; // sub  sp, sp, #(tmp * 4)
-    }
-    else if (i == IMM) {
+    if (i == IMM) {
       tmp = *pc++;
       if (0 <= tmp && tmp < 256)
         *je++ = 0xe3a00000 + tmp; // mov r0, #(tmp)
@@ -534,12 +527,19 @@ int *codegenarm(int *jitmem, int reloc)
         *je++ = 0xe5150000 + (literal - ll) * 4; // ldr  r0, [r5, #-(literal - ll)]
       }
     }
+    else if (i == ENT) {
+      *je++ = 0xe92d4800;             // push {fp, lr}
+      *je++ = 0xe28db004;             // add  fp, sp, #4
+      tmp = *pc++;
+      if (tmp)
+        *je++ = 0xe24dd000 + tmp * 4; // sub  sp, sp, #(tmp * 4)
+    }
     else if (i == ADJ)
       *je++ = 0xe28dd000 + *pc++ * 4; // add sp, sp, #(tmp * 4)
-    else if (i == PSH)
-      *je++ = 0xe52d0004;       // push {r0}
     else if (i == LEV)
       *je++ = 0xe8bd8800;       // pop {fp, pc}
+    else if (i == PSH)
+      *je++ = 0xe52d0004;       // push {r0}
     else if (i >= OPEN) {
       if (i == PRTF) tmp = (int)dlsym(0, "printf");
       else if (i == EXIT) tmp = (int)dlsym(0, "exit");
