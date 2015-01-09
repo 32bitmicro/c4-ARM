@@ -722,7 +722,10 @@ int jitarm(int poolsz, int *start, int argc, char **argv)
   *je++ = 0xe51f5018;       // ldr     r5, [pc, #-20] ; literal
   *je++ = 0xe51f0018;       // ldr     r0, [pc, #-20] ; argc
   *je++ = 0xe51f1018;       // ldr     r1, [pc, #-20] ; argv
+  *je++ = 0xe52d0004;       // push    {r0}
+  *je++ = 0xe52d1004;       // push    {r1}
   tje = je++;               // bl      jitmain
+  *je++ = 0xe28dd008;       // add     sp, sp, #8
   *je++ = 0xe8bd9ff0;       // pop     {r4-r12, pc}
 
   // we can't handle if main is the first address because the bl
