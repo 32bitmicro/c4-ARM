@@ -537,7 +537,7 @@ int *codegenarm(int *jitmem, int reloc)
     else if (i == JSR) { pc++; je++; } // postponed till second pass
     else if (i == ENT) {
       *je++ = 0xe92d4800;             // push {fp, lr}
-      *je++ = 0xe28db004;             // add  fp, sp, #4
+      *je++ = 0xe28db000;             // add  fp, sp, #0
       tmp = *pc++;
       if (tmp)
         *je++ = 0xe24dd000 + tmp * 4; // sub  sp, sp, #(tmp * 4)
