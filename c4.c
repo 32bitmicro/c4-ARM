@@ -551,8 +551,10 @@ int *codegenarm(int *jitmem, int reloc)
     }
     else if (i == ADJ)
       *je++ = 0xe28dd000 + *pc++ * 4; // add sp, sp, #(tmp * 4)
-    else if (i == LEV)
+    else if (i == LEV) {
+      *je++ = 0xe28bd000;       // add sp, fp, #0
       *je++ = 0xe8bd8800;       // pop {fp, pc}
+    }
     else if (i == LI)
       *je++ = 0xe5900000;       // ldr r0, [r0]
     else if (i == PSH)
