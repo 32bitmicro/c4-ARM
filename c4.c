@@ -544,6 +544,7 @@ int *codegenarm(int *jitmem, int reloc)
     else if (i >= OPEN) {
       if (i == PRTF) tmp = (int)dlsym(0, "printf");
       else if (i == EXIT) tmp = (int)dlsym(0, "exit");
+      else { printf("unrecognized code %d\n", i); return 0; }
       if (*pc++ != ADJ) {
         printf("no ADJ after native proc!\n");
         exit(2);
