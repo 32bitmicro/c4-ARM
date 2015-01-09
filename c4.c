@@ -541,7 +541,7 @@ int *codegenarm(int *jitmem, int reloc)
         *je++ = 0xe5150000 + (literal - ll) * 4; // ldr  r0, [r5, #-(literal - ll)]
       }
     }
-    else if (i == JSR) { pc++; je++; } // postponed till second pass
+    else if (i == JSR || i == JMP) { pc++; je++; } // postponed till second pass
     else if (i == BZ || i == BNZ) {
       *je++ = 0xe3300000;       // teq r0, #0
       pc++; je++;               // postponed till second pass
@@ -643,8 +643,9 @@ int *codegenarm(int *jitmem, int reloc)
   while (pc <= e) {
     i = *pc & 0xff;
     je = (int*)(((*pc++ >> 8) & 0x00ffffff) | ((int)jitmem & 0xff000000)); // MSB is restored from jitmem
-    if (i == JSR || i == BZ || i == BNZ) {
+    if (i == JSR || i == JMP || i == BZ || i == BNZ) {
       if      (i == JSR)   *je = 0xeb000000; // bl #(tmp)
+      else if (i == JMP)   *je = 0xea000000; // bl #(tmp)
       else if (i == BZ)  *++je = 0x0a000000; // beq #(tmp)
       else if (i == BNZ) *++je = 0x1a000000; // bne #(tmp)
       tmp = ((*(int *)(*pc++) >> 8) & 0x00ffffff) | ((int)jitmem & 0xff000000); // extract address
