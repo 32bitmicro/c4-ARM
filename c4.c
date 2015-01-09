@@ -619,6 +619,11 @@ int *codegenarm(int *jitmem, int reloc)
       *je++ = 0xe49d1004;        // pop     {r1}
       *je++ = 0xe0000091;        // mul     r0, r1, r0
     }
+    else if (i == DIV || i == MOD) {
+      *je++ = 0xe3a00000;        // mov     r0, #0
+      *je++ = 0xe5800000;        // str     r0, [r0]
+      printf("division/modulo is NOT supported\n");
+    }
     else if (i >= OPEN) {
       if (i == PRTF) tmp = (int)dlsym(0, "printf");
       else if (i == EXIT) tmp = (int)dlsym(0, "exit");
@@ -717,8 +722,8 @@ int jitarm(int poolsz, int *start, int argc, char **argv)
     return 1;
 
   jitmain = ((*(int *)start >> 8) & 0x00ffffff) - ((int)tje & 0x00ffffff);
-  *tje = 0xeb000000 | ((jitmain - 8) / 4);
-  __clear_cache(jitmem, jitmem + poolsz/4);
+  *tje = 0xeb000000 | ((jitmain - 8) >> 2);
+  __clear_cache(jitmem, jitmem + (poolsz >> 2));
   qsort(sym, 2, 1, (void *)_start); // hack to call a function pointer
   return 0;
 }
