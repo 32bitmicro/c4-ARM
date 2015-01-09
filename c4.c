@@ -615,6 +615,10 @@ int *codegenarm(int *jitmem, int reloc)
       *je++ = 0xe49d1004;        // pop     {r1}
       *je++ = 0xe0410000;        // sub     r0, r1, r0
     }
+    else if (i == MUL) {
+      *je++ = 0xe49d1004;        // pop     {r1}
+      *je++ = 0xe0000091;        // mul     r0, r1, r0
+    }
     else if (i >= OPEN) {
       if (i == PRTF) tmp = (int)dlsym(0, "printf");
       else if (i == EXIT) tmp = (int)dlsym(0, "exit");
