@@ -525,7 +525,14 @@ int *codegenarm(int *jitmem, int reloc)
       if (i <= ADJ) printf(" %d\n", pc[1]); else printf("\n");
     }
     *pc++ = ((int)je << 8) | i; // for later relocation of JMP/JSR/BZ/BNZ
-    if (i == IMM) {
+    if (i == LEA) {
+      tmp = *pc++;
+      if (tmp >= 0)
+        *je++ = 0xe28b0000 | tmp * 4;    // add     r0, fp, #(tmp)
+      else
+        *je++ = 0xe24b0000 | (-tmp) * 4; // sub     r0, fp, #(tmp)
+    }
+    else if (i == IMM) {
       tmp = *pc++;
       if (0 <= tmp && tmp < 256)
         *je++ = 0xe3a00000 + tmp; // mov r0, #(tmp)
