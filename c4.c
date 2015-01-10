@@ -671,14 +671,16 @@ int *codegenarm(int *jitmem, int reloc)
     if (genpool) {
       if (debug) printf("POOL %d %d %d\n", genpool, il - immloc, je - imm0);
       *je++ = 0; *je++ = 0; // random valid instructions for the pipeline
+      *iv = 0;
       while (il > immloc) {
         tmp = *--il;
         if ((int)je > tmp + 4096 + 8) { printf("can't reach the pool\n"); exit(5); }
+        iv--; if (iv[0] == iv[1]) je--;
         if (tmp & 1)
           *(int*)(tmp - 1) = 0xe59ff000 | ((int)je - tmp - 7); // ldr pc, [pc, #..]
         else
           *(int*)tmp = 0xe59f0000 | ((int)je - tmp - 8); // ldr r0, [pc, #..]
-        *je++ = *--iv;
+        *je++ = *iv;
       }
       if (genpool == 2) // jump past the pool
         *tje = 0xea000000 | ((int)je - (int)tje - 8); // b #(je)
