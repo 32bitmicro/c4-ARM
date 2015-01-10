@@ -568,7 +568,7 @@ int *codegenarm(int *jitmem, int reloc)
       je = je + 2;
     }
     else if (i == SHL) { *je++ = 0xe49d1004; *je++ = 0xe1a00011; } // pop {r1}; lsl r0, r1, r0
-    else if (i == SHR) { *je++ = 0xe49d1004; *je++ = 0xe1a00031; } // pop {r1}; lsr r0, r1, r0
+    else if (i == SHR) { *je++ = 0xe49d1004; *je++ = 0xe1a00051; } // pop {r1}; asr r0, r1, r0
     else if (i == ADD) { *je++ = 0xe49d1004; *je++ = 0xe0800001; } // pop {r1}; add r0, r0, r1
     else if (i == SUB) { *je++ = 0xe49d1004; *je++ = 0xe0410000; } // pop {r1}; sub r0, r1, r0
     else if (i == MUL) { *je++ = 0xe49d1004; *je++ = 0xe0000091; } // pop {r1}; mul r0, r1, r0
