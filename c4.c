@@ -585,13 +585,16 @@ int *codegenarm(int *jitmem, int reloc)
       else if (i == QSRT) tmp = (int)dlsym(0, "qsort");  else if (i == EXIT) tmp = (int)dlsym(0, "exit");
       else { printf("unrecognized code %d\n", i); return 0; }
       if (*pc++ != ADJ) { printf("no ADJ after native proc!\n"); exit(2); }
-      i = *pc++;
-      if (i > 4) { printf("no support for 5+ arguments!\n"); exit(3); }
+      i = *pc;
+      if (i > 10) { printf("no support for 10+ arguments!\n"); exit(3); }
       while (i > 0) *je++ = 0xe49d0004 | (--i << 12); // pop r(i-1)
+      i = *pc++;
+      if (i > 4) *je++ = 0xe92d03f0; // push {r4-r9}
       *je++ = 0xe28fe000;       // add lr, pc, #0
       if (!imm0) imm0 = je;
       *il++ = (int)je++ + 1;
       *iv++ = tmp;
+      if (i > 4) *je++ = 0xe28dd018; // add sp, sp, #24
     }
     else { printf("code generation failed for %d!\n", i); return 0; }
 
