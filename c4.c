@@ -549,6 +549,7 @@ int *codegenarm(int *jitmem, int reloc)
     else if (i == ENT) {
       *je++ = 0xe92d4800; *je++ = 0xe28db000; // push {fp, lr}; add  fp, sp, #0
       tmp = *pc++; if (tmp) *je++ = 0xe24dd000 + tmp * 4; // sub  sp, sp, #(tmp * 4)
+      if (tmp >= 64 || tmp < 0) { printf("jit: ENT %d out of bounds\n", tmp); exit(6); }
     }
     else if (i == ADJ)   *je++ = 0xe28dd000 + *pc++ * 4; // add sp, sp, #(tmp * 4)
     else if (i == LEV) { *je++ = 0xe28bd000; *je++ = 0xe8bd8800; } // add sp, fp, #0; pop {fp, pc}
