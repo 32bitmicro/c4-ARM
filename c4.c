@@ -539,102 +539,40 @@ int *codegenarm(int *jitmem, int reloc)
     }
     else if (i == IMM) {
       tmp = *pc++;
-      if (0 <= tmp && tmp < 256)
-        *je++ = 0xe3a00000 + tmp; // mov r0, #(tmp)
-      else {
-        if (!imm0) imm0 = je;
-        *il++ = (int)(je++);
-        *iv++ = tmp;
-      }
+      if (0 <= tmp && tmp < 256) *je++ = 0xe3a00000 + tmp; // mov r0, #(tmp)
+      else { if (!imm0) imm0 = je; *il++ = (int)(je++); *iv++ = tmp;}
     }
     else if (i == JSR || i == JMP) { pc++; je++; } // postponed till second pass
-    else if (i == BZ || i == BNZ) {
-      *je++ = 0xe3300000;       // teq r0, #0
-      pc++; je++;               // postponed till second pass
-    }
+    else if (i == BZ || i == BNZ) {*je++ = 0xe3300000; pc++; je++; } // teq r0, #0
     else if (i == ENT) {
-      *je++ = 0xe92d4800;             // push {fp, lr}
-      *je++ = 0xe28db000;             // add  fp, sp, #0
-      tmp = *pc++;
-      if (tmp)
-        *je++ = 0xe24dd000 + tmp * 4; // sub  sp, sp, #(tmp * 4)
+      *je++ = 0xe92d4800; *je++ = 0xe28db000; // push {fp, lr}; add  fp, sp, #0
+      tmp = *pc++; if (tmp) *je++ = 0xe24dd000 + tmp * 4; // sub  sp, sp, #(tmp * 4)
     }
-    else if (i == ADJ)
-      *je++ = 0xe28dd000 + *pc++ * 4; // add sp, sp, #(tmp * 4)
-    else if (i == LEV) {
-      *je++ = 0xe28bd000;       // add sp, fp, #0
-      *je++ = 0xe8bd8800;       // pop {fp, pc}
-      if (imm0) genpool = 1;
-    }
-    else if (i == LI)
-      *je++ = 0xe5900000;       // ldr r0, [r0]
-    else if (i == LC)
-      *je++ = 0xe5d00000;       // ldrb r0, [r0]
-    else if (i == SI) {
-      *je++ = 0xe49d1004;       // pop {r1}
-      *je++ = 0xe5810000;       // str r0, [r1]
-    }
-    else if (i == SC) {
-      *je++ = 0xe49d1004;       // pop {r1}
-      *je++ = 0xe5c10000;       // strb r0, [r1]
-    }
-    else if (i == PSH)
-      *je++ = 0xe52d0004;       // push {r0}
-    else if (i == OR) {
-      *je++ = 0xe49d1004;        // pop     {r1}
-      *je++ = 0xe1810000;        // orr     r0, r1, r0
-    }
-    else if (i == XOR) {
-      *je++ = 0xe49d1004;        // pop     {r1}
-      *je++ = 0xe0210000;        // eor     r0, r1, r0
-    }
-    else if (i == AND) {
-      *je++ = 0xe49d1004;        // pop     {r1}
-      *je++ = 0xe0010000;        // and     r0, r1, r0
-    }
-    else if (i == EQ || i == NE || i == LT ||
-             i == GE || i == GT || i == LE) {
-      *je++ = 0xe49d1004;       // pop     {r1}
-      *je++ = 0xe1510000;       // cmp     r1, r0
-      if (i == EQ || i == NE) {
-        je[0] = 0x03a00000;     // moveq   r0, #0
-        je[1] = 0x13a00000;     // movne   r0, #0
-      } else if (i == LT || i == GE) {
-        je[0] = 0xb3a00000;     // movlt   r0, #0
-        je[1] = 0xa3a00000;     // movge   r0, #0
-      } else {
-        je[0] = 0xc3a00000;     // movgt   r0, #0
-        je[1] = 0xd3a00000;     // movle   r0, #0
-      }
-      if (i == EQ || i == LT || i == GT)
-        je[0] = je[0] | 1;
-      else
-        je[1] = je[1] | 1;
+    else if (i == ADJ)   *je++ = 0xe28dd000 + *pc++ * 4; // add sp, sp, #(tmp * 4)
+    else if (i == LEV) { *je++ = 0xe28bd000; *je++ = 0xe8bd8800; } // add sp, fp, #0; pop {fp, pc}
+    else if (i == LI)    *je++ = 0xe5900000; // ldr r0, [r0]
+    else if (i == LC)    *je++ = 0xe5d00000; // ldrb r0, [r0]
+    else if (i == SI) {  *je++ = 0xe49d1004; *je++ = 0xe5810000; } // pop {r1}; str r0, [r1]
+    else if (i == SC) {  *je++ = 0xe49d1004; *je++ = 0xe5c10000; } // pop {r1}; strb r0, [r1]
+    else if (i == PSH)   *je++ = 0xe52d0004; // push {r0}
+    else if (i == OR) {  *je++ = 0xe49d1004; *je++ = 0xe1810000; } // pop {r1}; orr r0, r1, r0
+    else if (i == XOR) { *je++ = 0xe49d1004; *je++ = 0xe0210000; }        // pop {r1}; eor r0, r1, r0
+    else if (i == AND) { *je++ = 0xe49d1004; *je++ = 0xe0010000; }        // pop {r1}; and r0, r1, r0
+    else if (i <= EQ || i <= GE) {
+      *je++ = 0xe49d1004; *je++ = 0xe1510000; // pop {r1}; cmp r1, r0
+      if (i <= NE) { je[0] = 0x03a00000; je[1] = 0x13a00000; } // moveq r0, #0; movne r0, #0
+      else if (i == LT || i == GE) { je[0] = 0xb3a00000; je[1] = 0xa3a00000; } // movlt r0, #0; movge   r0, #0
+      else { je[0] = 0xc3a00000; je[1] = 0xd3a00000; } // movgt r0, #0; movle r0, #0
+      if (i == EQ || i == LT || i == GT) je[0] = je[0] | 1; else je[1] = je[1] | 1;
       je = je + 2;
     }
-    else if (i == SHL) {
-      *je++ = 0xe49d1004;        // pop     {r1}
-      *je++ = 0xe1a00011;        // lsl     r0, r1, r0
-    }
-    else if (i == SHR) {
-      *je++ = 0xe49d1004;        // pop     {r1}
-      *je++ = 0xe1a00031;        // lsr     r0, r1, r0
-    }
-    else if (i == ADD) {
-      *je++ = 0xe49d1004;        // pop     {r1}
-      *je++ = 0xe0800001;        // add     r0, r0, r1
-    }
-    else if (i == SUB) {
-      *je++ = 0xe49d1004;        // pop     {r1}
-      *je++ = 0xe0410000;        // sub     r0, r1, r0
-    }
-    else if (i == MUL) {
-      *je++ = 0xe49d1004;        // pop     {r1}
-      *je++ = 0xe0000091;        // mul     r0, r1, r0
-    }
+    else if (i == SHL) { *je++ = 0xe49d1004; *je++ = 0xe1a00011; } // pop {r1}; lsl r0, r1, r0
+    else if (i == SHR) { *je++ = 0xe49d1004; *je++ = 0xe1a00031; } // pop {r1}; lsr r0, r1, r0
+    else if (i == ADD) { *je++ = 0xe49d1004; *je++ = 0xe0800001; } // pop {r1}; add r0, r0, r1
+    else if (i == SUB) { *je++ = 0xe49d1004; *je++ = 0xe0410000; } // pop {r1}; sub r0, r1, r0
+    else if (i == MUL) { *je++ = 0xe49d1004; *je++ = 0xe0000091; } // pop {r1}; mul r0, r1, r0
     else if (i == DIV || i == MOD) {
-      *je++ = 0xe3a00000;        // mov     r0, #0
-      *je++ = 0xe5800000;        // str     r0, [r0]
+      *je++ = 0xe3a00000; *je++ = 0xe5800000; // mov r0, #0; str r0, [r0]
       printf("division/modulo is NOT supported\n");
     }
     else if (i >= OPEN) {
@@ -646,17 +584,10 @@ int *codegenarm(int *jitmem, int reloc)
       else if (i == MMAP) tmp = (int)dlsym(0, "mmap");   else if (i == DSYM) tmp = (int)dlsym(0, "dlsym");
       else if (i == QSRT) tmp = (int)dlsym(0, "qsort");  else if (i == EXIT) tmp = (int)dlsym(0, "exit");
       else { printf("unrecognized code %d\n", i); return 0; }
-      if (*pc++ != ADJ) {
-        printf("no ADJ after native proc!\n");
-        exit(2);
-      }
+      if (*pc++ != ADJ) { printf("no ADJ after native proc!\n"); exit(2); }
       i = *pc++;
-      if (i > 4) {
-        printf("no support for 5+ arguments!\n");
-        exit(3);
-      }
-      while (i > 0)
-        *je++ = 0xe49d0004 | (--i << 12); // pop r(i-1)
+      if (i > 4) { printf("no support for 5+ arguments!\n"); exit(3); }
+      while (i > 0) *je++ = 0xe49d0004 | (--i << 12); // pop r(i-1)
       *je++ = 0xe28fe000;       // add lr, pc, #0
       if (!imm0) imm0 = je;
       *il++ = (int)je++ + 1;
@@ -664,9 +595,9 @@ int *codegenarm(int *jitmem, int reloc)
     }
     else { printf("code generation failed for %d!\n", i); return 0; }
 
-    if (!genpool && imm0 && (int)je > (int)imm0 + 3000) {
-      tje = je++;
-      genpool = 2;
+    if (imm0) {
+      if (i == LEV) genpool = 1;
+      else if ((int)je > (int)imm0 + 3000) {tje = je++; genpool = 2; }
     }
     if (genpool) {
       if (debug) printf("POOL %d %d %d\n", genpool, il - immloc, je - imm0);
