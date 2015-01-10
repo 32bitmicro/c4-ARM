@@ -737,7 +737,7 @@ int jit(int poolsz, int *start, int argc, char **argv)
 int jitarm(int poolsz, int *start, int argc, char **argv)
 {
   char *jitmem;      // executable memory for JIT-compiled native code
-  int jitmain, *je, *tje, *_start;
+  int jitmain, *je, *tje, *_start,  retval;
 
   // setup jit memory
   // PROT_EXEC | PROT_READ | PROT_WRITE = 7
@@ -747,7 +747,7 @@ int jitarm(int poolsz, int *start, int argc, char **argv)
   if (src)
     return 1;
   je = (int*)jitmem;
-  *je++ = 0;
+  *je++ = (int)&retval;
   *je++ = argc;
   *je++ = (int)argv;
   _start = je;
@@ -758,6 +758,7 @@ int jitarm(int poolsz, int *start, int argc, char **argv)
   *je++ = 0xe52d0004;       // push    {r0}
   *je++ = 0xe52d1004;       // push    {r1}
   tje = je++;               // bl      jitmain
+  *je++ = 0xe5850000;       // str     r0, [r5]
   *je++ = 0xe28dd008;       // add     sp, sp, #8
   *je++ = 0xe8bd9ff0;       // pop     {r4-r12, pc}
 
@@ -772,7 +773,7 @@ int jitarm(int poolsz, int *start, int argc, char **argv)
   *tje = 0xeb000000 | ((jitmain - 8) >> 2);
   __clear_cache(jitmem, jitmem + (poolsz >> 2));
   qsort(sym, 2, 1, (void *)_start); // hack to call a function pointer
-  return 0;
+  return retval;
 }
 
 int elf32(int poolsz, int *start)
