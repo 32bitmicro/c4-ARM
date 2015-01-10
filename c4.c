@@ -623,8 +623,10 @@ int *codegenarm(int *jitmem, int reloc)
           *(int*)tmp = 0xe59f0000 | ((int)je - tmp - 8); // ldr r0, [pc, #..]
         *je++ = *iv;
       }
-      if (genpool == 2) // jump past the pool
-        *tje = 0xea000000 | ((int)je - (int)tje - 8); // b #(je)
+      if (genpool == 2) { // jump past the pool
+        tmp = ((int)je - (int)tje - 8) >> 2;
+        *tje = 0xea000000 | (tmp & 0x00ffffff); // b #(je)
+      }
       imm0 = 0;
       genpool = 0;
     }
