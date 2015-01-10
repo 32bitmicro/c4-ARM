@@ -43,7 +43,7 @@ enum {
 // opcodes
 enum { LEA ,IMM ,JMP ,JSR ,BZ  ,BNZ ,ENT ,ADJ ,LEV ,LI  ,LC  ,SI  ,SC  ,PSH ,
        OR  ,XOR ,AND ,EQ  ,NE  ,LT  ,GT  ,LE  ,GE  ,SHL ,SHR ,ADD ,SUB ,MUL ,DIV ,MOD ,
-       OPEN,READ,WRIT,CLOS,PRTF,MALC,MSET,MCMP,MCPY,MMAP,DSYM,QSRT,EXIT };
+       OPEN,READ,WRIT,CLOS,PRTF,MALC,MSET,MCMP,MCPY,MMAP,DSYM,QSRT,CLCA,EXIT };
 
 // types
 enum { CHAR, INT, PTR };
@@ -64,7 +64,7 @@ void next()
         while (le < e) {
           printf("%8.4s", &"LEA ,IMM ,JMP ,JSR ,BZ  ,BNZ ,ENT ,ADJ ,LEV ,LI  ,LC  ,SI  ,SC  ,PSH ,"
                            "OR  ,XOR ,AND ,EQ  ,NE  ,LT  ,GT  ,LE  ,GE  ,SHL ,SHR ,ADD ,SUB ,MUL ,DIV ,MOD ,"
-                           "OPEN,READ,WRIT,CLOS,PRTF,MALC,MSET,MCMP,MCPY,DSYM,QSRT,MMAP,EXIT,"[*++le * 5]);
+                           "OPEN,READ,WRIT,CLOS,PRTF,MALC,MSET,MCMP,MCPY,DSYM,QSRT,MMAP,CLCA,EXIT"[*++le * 5]);
           if (*le <= ADJ) printf(" %d\n", *++le); else printf("\n");
         }
       }
@@ -360,7 +360,7 @@ int run(int poolsz, int *start, int argc, char **argv)
       printf("%d> %.4s", cycle,
         &"LEA ,IMM ,JMP ,JSR ,BZ  ,BNZ ,ENT ,ADJ ,LEV ,LI  ,LC  ,SI  ,SC  ,PSH ,"
          "OR  ,XOR ,AND ,EQ  ,NE  ,LT  ,GT  ,LE  ,GE  ,SHL ,SHR ,ADD ,SUB ,MUL ,DIV ,MOD ,"
-         "OPEN,READ,WRIT,CLOS,PRTF,MALC,MSET,MCMP,MCPY,DSYM,QSRT,MMAP,EXIT,"[i * 5]);
+         "OPEN,READ,WRIT,CLOS,PRTF,MALC,MSET,MCMP,MCPY,DSYM,QSRT,MMAP,CLCA,EXIT"[i * 5]);
       if (i <= ADJ) printf(" %d\n", *pc); else printf("\n");
     }
     if      (i == LEA) a = (int)(bp + *pc++);                             // load local address
@@ -406,7 +406,7 @@ int run(int poolsz, int *start, int argc, char **argv)
     else if (i == MCPY) a = (int)memcpy((char *)sp[2], (char *)sp[1], *sp);
     else if (i == MMAP) a = (int)mmap((char*)sp[5], sp[4], sp[3], sp[2], sp[1], *sp);
     else if (i == EXIT) { printf("exit(%d) cycle = %d\n", *sp, cycle); return *sp; }
-    else { printf("unknown instruction = %d! cycle = %d\n", i, cycle); return -1; }
+    else if (i != CLCA) { printf("unknown instruction = %d! cycle = %d\n", i, cycle); return -1; }
   }
 }
 
@@ -470,6 +470,7 @@ char *codegen(char *jitmem, int reloc)
       else if (i == MCMP) tmp = (int)dlsym(0, "memcmp"); else if (i == MCPY) tmp = (int)dlsym(0, "memcpy");
       else if (i == MMAP) tmp = (int)dlsym(0, "mmap");   else if (i == DSYM) tmp = (int)dlsym(0, "dlsym");
       else if (i == QSRT) tmp = (int)dlsym(0, "qsort");  else if (i == EXIT) tmp = (int)dlsym(0, "exit");
+      else { printf("code generation failed for %d!\n", i); return 0; }
       if (*pc++ == ADJ) { i = *pc++; } else { printf("no ADJ after native proc!\n"); exit(2); }
       *je++ = 0xb9; *(int*)je = i << 2; je = je + 4;  // movl $(4 * n), %ecx;
       *(int*)je = 0xce29e689; je = je + 4; // mov %esp, %esi; sub %ecx, %esi;  -- %esi will adjust the stack
@@ -526,7 +527,7 @@ int *codegenarm(int *jitmem, int reloc)
       printf("%p -> %p: %8.4s", pc, je,
              &"LEA ,IMM ,JMP ,JSR ,BZ  ,BNZ ,ENT ,ADJ ,LEV ,LI  ,LC  ,SI  ,SC  ,PSH ,"
              "OR  ,XOR ,AND ,EQ  ,NE  ,LT  ,GT  ,LE  ,GE  ,SHL ,SHR ,ADD ,SUB ,MUL ,DIV ,MOD ,"
-             "OPEN,READ,WRIT,CLOS,PRTF,MALC,MSET,MCMP,MCPY,DSYM,QSRT,MMAP,EXIT,"[i * 5]);
+             "OPEN,READ,WRIT,CLOS,PRTF,MALC,MSET,MCMP,MCPY,DSYM,QSRT,MMAP,CLCA,EXIT"[i * 5]);
       if (i <= ADJ) printf(" %d\n", pc[1]); else printf("\n");
     }
     *pc++ = ((int)je << 8) | i; // for later relocation of JMP/JSR/BZ/BNZ
@@ -574,6 +575,11 @@ int *codegenarm(int *jitmem, int reloc)
     else if (i == DIV || i == MOD) {
       *je++ = 0xe3a00000; *je++ = 0xe5800000; // mov r0, #0; str r0, [r0]
       printf("division/modulo is NOT supported\n");
+    }
+    else if (i == CLCA) {
+      *je++ = 0xe59d0004; *je++ = 0xe59d1000; // ldr r0, [sp, #4]; ldr r1, [sp]
+      *je++ = 0xe3a0780f; *je++ = 0xe2877002; // mov r7, #0xf0000; add r7, r7, #2
+      *je++ = 0xe3a02000; *je++ = 0xef000000; // mov r2, #0;       svc 0
     }
     else if (i >= OPEN) {
       if      (i == OPEN) tmp = (int)dlsym(0, "open");   else if (i == READ) tmp = (int)dlsym(0, "read");
@@ -860,7 +866,7 @@ int main(int argc, char **argv)
   }
 
   p = "char else enum if int return sizeof while "
-      "open read write close printf malloc memset memcmp memcpy mmap dlsym qsort exit void main";
+      "open read write close printf malloc memset memcmp memcpy mmap dlsym qsort __clear_cache exit void main";
   i = Char; while (i <= While) { next(); id[Tk] = i++; } // add keywords to symbol table
   i = OPEN; while (i <= EXIT) { next(); id[Class] = Sys; id[Type] = INT; id[Val] = i++; } // add library to symbol table
   next(); id[Tk] = Char; // handle void type
