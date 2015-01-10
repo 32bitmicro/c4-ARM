@@ -513,11 +513,15 @@ int *codegenarm(int *jitmem, int reloc)
   int i, tmp, genpool;      // temps
   int *je, *tje;    // current position in emitted native code
   int *immloc, *immval, *il, *iv, *imm0;
+  char neg_char;
+  int neg_int;
 
   immloc = il = malloc(1024 * 4);
   immval = iv = malloc(1024 * 4);
   imm0 = 0;
   genpool = 0;
+  neg_char = 255;
+  neg_int = neg_char;
 
   // first pass: emit native code
   pc = text + 1; je = jitmem; line = 0;
@@ -554,7 +558,7 @@ int *codegenarm(int *jitmem, int reloc)
     else if (i == ADJ)   *je++ = 0xe28dd000 + *pc++ * 4; // add sp, sp, #(tmp * 4)
     else if (i == LEV) { *je++ = 0xe28bd000; *je++ = 0xe8bd8800; } // add sp, fp, #0; pop {fp, pc}
     else if (i == LI)    *je++ = 0xe5900000; // ldr r0, [r0]
-    else if (i == LC)    *je++ = 0xe5d00000; // ldrb r0, [r0]
+    else if (i == LC) {  *je++ = 0xe5d00000; if (neg_int < 0)  *je++ = 0xe6af0070; } // ldrb r0, [r0]; (sxtb r0, r0)
     else if (i == SI) {  *je++ = 0xe49d1004; *je++ = 0xe5810000; } // pop {r1}; str r0, [r1]
     else if (i == SC) {  *je++ = 0xe49d1004; *je++ = 0xe5c10000; } // pop {r1}; strb r0, [r1]
     else if (i == PSH)   *je++ = 0xe52d0004; // push {r0}
