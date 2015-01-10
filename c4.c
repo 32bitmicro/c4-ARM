@@ -533,6 +533,7 @@ int *codegenarm(int *jitmem, int reloc)
     *pc++ = ((int)je << 8) | i; // for later relocation of JMP/JSR/BZ/BNZ
     if (i == LEA) {
       tmp = *pc++;
+      if (tmp >= 64 || tmp <= -64) { printf("jit: LEA %d out of bounds\n", tmp); exit(6); }
       if (tmp >= 0)
         *je++ = 0xe28b0000 | tmp * 4;    // add     r0, fp, #(tmp)
       else
