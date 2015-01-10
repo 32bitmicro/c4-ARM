@@ -670,7 +670,6 @@ int *codegenarm(int *jitmem, int reloc)
     }
     if (genpool) {
       if (debug) printf("POOL %d %d %d\n", genpool, il - immloc, je - imm0);
-      *je++ = 0; *je++ = 0; // random valid instructions for the pipeline
       *iv = 0;
       while (il > immloc) {
         tmp = *--il;
