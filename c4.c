@@ -694,11 +694,6 @@ int jitarm(int poolsz, int *start, int argc, char **argv)
   *je++ = 0xe5850000;       // str     r0, [r5]
   *je++ = 0xe28dd008;       // add     sp, sp, #8
   *je++ = 0xe8bd9ff0;       // pop     {r4-r12, pc}
-
-  // we can't handle if main is the first address because the bl
-  // offset would be negative. add some padding to avoid that
-  je++;
-
   if (!(je = codegenarm(je, 0)))
     return 1;
 
