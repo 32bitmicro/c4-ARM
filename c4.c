@@ -549,7 +549,7 @@ int *codegenarm(int *jitmem, int *jitmap, int reloc)
       else { if (!imm0) imm0 = je; *il++ = (int)(je++); *iv++ = tmp;}
     }
     else if (i == JSR || i == JMP) { pc++; je++; } // postponed till second pass
-    else if (i == BZ || i == BNZ) {*je++ = 0xe3300000; pc++; je++; } // teq r0, #0
+    else if (i == BZ || i == BNZ) { *je++ = 0xe3500000; pc++; je++; } // cmp r0, #0
     else if (i == ENT) {
       *je++ = 0xe92d4800; *je++ = 0xe28db000; // push {fp, lr}; add  fp, sp, #0
       tmp = *pc++; if (tmp) *je++ = 0xe24dd000 + tmp * 4; // sub  sp, sp, #(tmp * 4)
