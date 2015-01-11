@@ -565,7 +565,7 @@ int *codegenarm(int *jitmem, int *jitmap, int reloc)
     else if (i == OR) {  *je++ = 0xe49d1004; *je++ = 0xe1810000; } // pop {r1}; orr r0, r1, r0
     else if (i == XOR) { *je++ = 0xe49d1004; *je++ = 0xe0210000; }        // pop {r1}; eor r0, r1, r0
     else if (i == AND) { *je++ = 0xe49d1004; *je++ = 0xe0010000; }        // pop {r1}; and r0, r1, r0
-    else if (i <= EQ || i <= GE) {
+    else if (EQ <= i && i <= GE) {
       *je++ = 0xe49d1004; *je++ = 0xe1510000; // pop {r1}; cmp r1, r0
       if (i <= NE) { je[0] = 0x03a00000; je[1] = 0x13a00000; } // moveq r0, #0; movne r0, #0
       else if (i == LT || i == GE) { je[0] = 0xb3a00000; je[1] = 0xa3a00000; } // movlt r0, #0; movge   r0, #0
