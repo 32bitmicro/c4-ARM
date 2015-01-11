@@ -535,7 +535,7 @@ int *codegenarm(int *jitmem, int *jitmap, int reloc)
              "OPEN,READ,WRIT,CLOS,PRTF,MALC,MSET,MCMP,MCPY,DSYM,QSRT,MMAP,CLCA,EXIT"[i * 5]);
       if (i <= ADJ) printf(" %d\n", pc[1]); else printf("\n");
     }
-    jitmap[pc++ - text] = (int)je;
+    jitmap[((int)pc++ - (int)text) >> 2] = (int)je;
     if (i == LEA) {
       tmp = *pc++;
       if (tmp >= 64 || tmp <= -64) { printf("jit: LEA %d out of bounds\n", tmp); exit(6); }
@@ -553,7 +553,7 @@ int *codegenarm(int *jitmem, int *jitmap, int reloc)
     else if (i == BZ || i == BNZ) { *je++ = 0xe3500000; pc++; je++; } // cmp r0, #0
     else if (i == ENT) {
       *je++ = 0xe92d4800; *je++ = 0xe28db000; // push {fp, lr}; add  fp, sp, #0
-      tmp = *pc++; if (tmp) *je++ = 0xe24dd000 + tmp * 4; // sub  sp, sp, #(tmp * 4)
+      tmp = *pc++; if (tmp) *je++ = 0xe24dd000 | (tmp * 4); // sub  sp, sp, #(tmp * 4)
       if (tmp >= 64 || tmp < 0) { printf("jit: ENT %d out of bounds\n", tmp); exit(6); }
     }
     else if (i == ADJ)   *je++ = 0xe28dd000 + *pc++ * 4; // add sp, sp, #(tmp * 4)
@@ -643,14 +643,14 @@ int *codegenarm(int *jitmem, int *jitmap, int reloc)
   // second pass
   pc = text + 1;
   while (pc <= e) {
-    je = (int*)jitmap[pc - text]; i = *pc++;
+    je = (int*)jitmap[((int)pc - (int)text) >> 2]; i = *pc++;
     if (i == JSR || i == JMP || i == BZ || i == BNZ) {
       if      (i == JSR)   *je = 0xeb000000; // bl #(tmp)
       else if (i == JMP)   *je = 0xea000000; // bl #(tmp)
       else if (i == BZ)  *++je = 0x0a000000; // beq #(tmp)
       else if (i == BNZ) *++je = 0x1a000000; // bne #(tmp)
       tmp = *pc++;
-      *je = *je | (((jitmap[(int*)tmp - text] - (int)je - 8) >> 2) & 0x00ffffff);
+      *je = *je | (((jitmap[(tmp - (int)text) >> 2] - (int)je - 8) >> 2) & 0x00ffffff);
     }
     else if (i < LEV) { ++pc; }
   }
@@ -717,7 +717,7 @@ int jitarm(int poolsz, int *start, int argc, char **argv)
   if (!(je = codegenarm(je, jitmap, 0)))
     return 1;
   if (je >= jitmap) { printf("jitmem too small\n"); exit(7); }
-  *tje = 0xeb000000 | (((jitmap[start - text] - (int)tje - 8) >> 2) & 0x00ffffff);
+  *tje = 0xeb000000 | (((jitmap[((int)start - (int)text) >> 2] - (int)tje - 8) >> 2) & 0x00ffffff);
   __clear_cache(jitmem, je);
   if (record) printf("%p-%p %p %p\n", jitmem, je, text, data);
   qsort(sym, 2, 1, (void *)_start); // hack to call a function pointer
