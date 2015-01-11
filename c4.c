@@ -690,8 +690,8 @@ int jitarm(int poolsz, int *start, int argc, char **argv)
   // setup jit memory
   // PROT_EXEC | PROT_READ | PROT_WRITE = 7
   // MAP_PRIVATE | MAP_ANON = 0x22
-  if (debug) jitmem = mmap(0, poolsz * 4, 7, 0x22, -1, 0);
-  else       jitmem = mmap(0, poolsz, 7, 0x22, -1, 0);
+  if (record) jitmem = mmap(0, poolsz * 4, 7, 0x22, -1, 0);
+  else        jitmem = mmap(0, poolsz, 7, 0x22, -1, 0);
   if (!jitmem) { printf("could not mmap(%d) jit executable memory\n", poolsz); return -1; }
   if (src)
     return 1;
