@@ -507,7 +507,7 @@ char *codegen(char *jitmem, int reloc)
   return tje;
 }
 
-int *codegenarm(int *jitmem, int reloc)
+int *codegenarm(int *jitmem, int *jitmap, int reloc)
 {
   int *pc;
   int i, tmp, genpool;      // temps
@@ -534,7 +534,7 @@ int *codegenarm(int *jitmem, int reloc)
              "OPEN,READ,WRIT,CLOS,PRTF,MALC,MSET,MCMP,MCPY,DSYM,QSRT,MMAP,CLCA,EXIT"[i * 5]);
       if (i <= ADJ) printf(" %d\n", pc[1]); else printf("\n");
     }
-    *pc++ = ((int)je << 8) | i; // for later relocation of JMP/JSR/BZ/BNZ
+    jitmap[pc++ - text] = (int)je;
     if (i == LEA) {
       tmp = *pc++;
       if (tmp >= 64 || tmp <= -64) { printf("jit: LEA %d out of bounds\n", tmp); exit(6); }
@@ -641,15 +641,14 @@ int *codegenarm(int *jitmem, int reloc)
   // second pass
   pc = text + 1;
   while (pc <= e) {
-    i = *pc & 0xff;
-    je = (int*)(((*pc++ >> 8) & 0x00ffffff) | ((int)jitmem & 0xff000000)); // MSB is restored from jitmem
+    je = (int*)jitmap[pc - text]; i = *pc++;
     if (i == JSR || i == JMP || i == BZ || i == BNZ) {
       if      (i == JSR)   *je = 0xeb000000; // bl #(tmp)
       else if (i == JMP)   *je = 0xea000000; // bl #(tmp)
       else if (i == BZ)  *++je = 0x0a000000; // beq #(tmp)
       else if (i == BNZ) *++je = 0x1a000000; // bne #(tmp)
-      tmp = ((*(int *)(*pc++) >> 8) & 0x00ffffff) | ((int)jitmem & 0xff000000); // extract address
-      *je = *je | (((tmp - (int)je - 8) >> 2) & 0x00ffffff);
+      tmp = *pc++;
+      *je = *je | (((jitmap[(int*)tmp - text] - (int)je - 8) >> 2) & 0x00ffffff);
     }
     else if (i < LEV) { ++pc; }
   }
@@ -684,7 +683,7 @@ int jit(int poolsz, int *start, int argc, char **argv)
 int jitarm(int poolsz, int *start, int argc, char **argv)
 {
   char *jitmem;      // executable memory for JIT-compiled native code
-  int jitmain, *je, *tje, *_start,  retval;
+  int *je, *tje, *_start,  retval, *jitmap;
 
   // setup jit memory
   // PROT_EXEC | PROT_READ | PROT_WRITE = 7
@@ -693,6 +692,7 @@ int jitarm(int poolsz, int *start, int argc, char **argv)
   if (!jitmem) { printf("could not mmap(%d) jit executable memory\n", poolsz); return -1; }
   if (src)
     return 1;
+  jitmap = (int*)(jitmem + (poolsz >> 1));
   je = (int*)jitmem;
   *je++ = (int)&retval;
   *je++ = argc;
@@ -708,11 +708,10 @@ int jitarm(int poolsz, int *start, int argc, char **argv)
   *je++ = 0xe5850000;       // str     r0, [r5]
   *je++ = 0xe28dd008;       // add     sp, sp, #8
   *je++ = 0xe8bd9ff0;       // pop     {r4-r12, pc}
-  if (!(je = codegenarm(je, 0)))
+  if (!(je = codegenarm(je, jitmap, 0)))
     return 1;
-
-  jitmain = ((*(int *)start >> 8) & 0x00ffffff) - ((int)tje & 0x00ffffff);
-  *tje = 0xeb000000 | ((jitmain - 8) >> 2);
+  if (je >= jitmap) { printf("jitmem too small\n"); exit(7); }
+  *tje = 0xeb000000 | (((jitmap[start - text] - (int)tje - 8) >> 2) & 0x00ffffff);
   __clear_cache(jitmem, jitmem + (poolsz >> 2));
   qsort(sym, 2, 1, (void *)_start); // hack to call a function pointer
   return retval;
