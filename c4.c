@@ -712,7 +712,7 @@ int jitarm(int poolsz, int *start, int argc, char **argv)
     return 1;
   if (je >= jitmap) { printf("jitmem too small\n"); exit(7); }
   *tje = 0xeb000000 | (((jitmap[start - text] - (int)tje - 8) >> 2) & 0x00ffffff);
-  __clear_cache(jitmem, jitmem + (poolsz >> 2));
+  __clear_cache(jitmem, je);
   qsort(sym, 2, 1, (void *)_start); // hack to call a function pointer
   return retval;
 }
