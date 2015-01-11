@@ -31,7 +31,8 @@ int *e, *le, *text,  // current position in emitted code
     loc,      // local variable offset
     line,     // current line number
     src,      // print source and assembly flag
-    debug;    // print executed instructions
+    debug,    // print executed instructions
+    record;   // keep a snapshot of some regs the r10 stack
 
 // tokens and classes (operators last and in precedence order)
 enum {
@@ -609,6 +610,7 @@ int *codegenarm(int *jitmem, int *jitmap, int reloc)
       if (i > 4) *je++ = 0xe28dd018; // add sp, sp, #24
     }
     else { printf("code generation failed for %d!\n", i); return 0; }
+    if (record) *je++ = 0xe92ac003; // stmfd r10!, {r0,r1,lr,pc}
 
     if (imm0) {
       if (i == LEV) genpool = 1;
@@ -688,12 +690,14 @@ int jitarm(int poolsz, int *start, int argc, char **argv)
   // setup jit memory
   // PROT_EXEC | PROT_READ | PROT_WRITE = 7
   // MAP_PRIVATE | MAP_ANON = 0x22
-  jitmem = mmap(0, poolsz, 7, 0x22, -1, 0);
+  if (debug) jitmem = mmap(0, poolsz * 4, 7, 0x22, -1, 0);
+  else       jitmem = mmap(0, poolsz, 7, 0x22, -1, 0);
   if (!jitmem) { printf("could not mmap(%d) jit executable memory\n", poolsz); return -1; }
   if (src)
     return 1;
   jitmap = (int*)(jitmem + (poolsz >> 1));
   je = (int*)jitmem;
+  if (record) *je++ = (int)jitmem + poolsz * 4;
   *je++ = (int)&retval;
   *je++ = argc;
   *je++ = (int)argv;
@@ -701,10 +705,12 @@ int jitarm(int poolsz, int *start, int argc, char **argv)
   *je++ = 0xe92d5ff0;       // push    {r4-r12, lr}
   *je++ = 0xe51f0014;       // ldr     r0, [pc, #-20] ; argc
   *je++ = 0xe51f1014;       // ldr     r1, [pc, #-20] ; argv
+  if (record) *je++ = 0xe51fa024; // ldr     r10, [pc, #-36] ; jitmem bottom
   *je++ = 0xe52d0004;       // push    {r0}
   *je++ = 0xe52d1004;       // push    {r1}
   tje = je++;               // bl      jitmain
-  *je++ = 0xe51f502c;       // ldr     r5, [pc, #-44] ; retval
+  if (record) *je++ = 0xe51f5030; // ldr     r5, [pc, #-48] ; retval
+  else        *je++ = 0xe51f502c; // ldr     r5, [pc, #-44] ; retval
   *je++ = 0xe5850000;       // str     r0, [r5]
   *je++ = 0xe28dd008;       // add     sp, sp, #8
   *je++ = 0xe8bd9ff0;       // pop     {r4-r12, pc}
@@ -713,6 +719,7 @@ int jitarm(int poolsz, int *start, int argc, char **argv)
   if (je >= jitmap) { printf("jitmem too small\n"); exit(7); }
   *tje = 0xeb000000 | (((jitmap[start - text] - (int)tje - 8) >> 2) & 0x00ffffff);
   __clear_cache(jitmem, je);
+  if (record) printf("%p-%p %p %p\n", jitmem, je, text, data);
   qsort(sym, 2, 1, (void *)_start); // hack to call a function pointer
   return retval;
 }
